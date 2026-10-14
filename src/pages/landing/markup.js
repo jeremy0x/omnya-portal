@@ -721,6 +721,9 @@ const LANDING_HTML = `
     <footer>
         <div class="wrap">
             <span class="mono">&copy; 2026 Omnya Growth LLC</span>
+            <a href="/terms" class="mono">Terms of Service</a>
+            <a href="/privacy" class="mono">Privacy Policy</a>
+            <a href="/data-deletion" class="mono">Data Deletion</a>
             <span class="mono sp">Launch to legacy</span>
         </div>
     </footer>
