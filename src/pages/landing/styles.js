@@ -1849,6 +1849,17 @@ const LANDING_CSS = `
             color: var(--ink-faint)
         }
 
+        footer a.mono {
+            color: var(--ink-faint);
+            text-decoration: none;
+            transition: color .15s ease
+        }
+
+        footer a.mono:hover {
+            color: var(--ink);
+            text-decoration: underline
+        }
+
         footer .sp {
             margin-left: auto
         }
