@@ -897,6 +897,149 @@ function ConnectionCard({ platform, connection, busy, onConnect, onDisconnect, o
           </div>
         </div>
       )}
+
+      {platform === 'tiktok' && <TikTokLinkPanel />}
+    </div>
+  );
+}
+
+// Spec 0002: track TikTok from a pasted profile link instead of OAuth, while
+// TikTok limits OAuth to test accounts. Slice 1 is the handle input and one
+// status line per state; the full card (Check now, copy, Remove, every state
+// in plain words) is slice 2.
+//
+// The state is read straight from creator_social_accounts_safe under RLS; the
+// write goes through /api/tiktok-link/save, because only the server may set
+// link_status (AC-17).
+const LINK_MIGRATION_CODES = new Set(['42703', '42P01', 'PGRST204', 'PGRST205']);
+
+function fmtDate(iso) {
+  if (!iso) return '';
+  const d = new Date(iso);
+  return Number.isNaN(d.getTime()) ? '' : d.toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric' });
+}
+
+function TikTokLinkPanel() {
+  const [row, setRow] = useState(null);
+  const [loaded, setLoaded] = useState(false);
+  const [switchedOff, setSwitchedOff] = useState(false);
+  const [input, setInput] = useState('');
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState('');
+
+  const load = useCallback(async () => {
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!session) return;
+    const { data, error: readErr } = await supabase
+      .from('creator_social_accounts_safe')
+      .select('link_handle, link_status, link_code, link_code_expires_at, link_rejected_reason, ' +
+              'link_health, link_last_error, link_last_fetched_at, follower_count')
+      .eq('user_id', session.user.id)
+      .eq('platform', 'tiktok')
+      .maybeSingle();
+    if (readErr && LINK_MIGRATION_CODES.has(String(readErr.code))) setSwitchedOff(true);
+    else if (readErr) setError('Could not load your TikTok link.');
+    setRow(data || null);
+    setLoaded(true);
+  }, []);
+
+  useEffect(() => { load(); }, [load]);
+
+  const save = async (e) => {
+    e.preventDefault();
+    setSaving(true);
+    setError('');
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) throw new Error('Not signed in');
+      const res = await fetch('/api/tiktok-link/save', {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${session.access_token}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ handle: input }),
+      });
+      const json = await res.json().catch(() => ({}));
+      if (json && json.error && json.error.code === 'migration_missing') { setSwitchedOff(true); return; }
+      if (!res.ok || !json.ok) {
+        throw new Error((json.error && json.error.message) || json.error || 'Could not save your TikTok link.');
+      }
+      setInput('');
+      await load();
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  if (!loaded) return null;
+
+  const box = {
+    marginTop: 14, padding: '12px 14px', borderRadius: 8,
+    background: '#f9fafb', border: '1px solid #f3f4f6', fontSize: 13, color: '#374151',
+  };
+
+  if (switchedOff) {
+    return <div style={box} role="status">TikTok link tracking isn't switched on yet.</div>;
+  }
+
+  const status = row && row.link_status;
+  const showInput = !status || status === 'rejected';
+
+  return (
+    <div style={box}>
+      <p style={{ margin: '0 0 8px', fontWeight: 600, color: '#111827' }}>Track TikTok with your profile link</p>
+
+      {status === 'pending_code' && (
+        <p style={{ margin: 0 }} role="status">
+          Add <strong style={{ fontFamily: 'monospace', fontSize: 14 }}>{row.link_code}</strong> to your TikTok bio
+          for @{row.link_handle}. We check it every few hours, then your manager confirms it. The code expires on{' '}
+          {fmtDate(row.link_code_expires_at)}.
+        </p>
+      )}
+      {status === 'code_found' && (
+        <p style={{ margin: 0 }} role="status">
+          We found your code on @{row.link_handle}. Waiting for your manager to confirm it.
+        </p>
+      )}
+      {status === 'verified' && (
+        <p style={{ margin: 0 }} role="status">
+          Verified: @{row.link_handle}
+          {row.follower_count != null && <> · {Number(row.follower_count).toLocaleString()} followers</>}
+          {row.link_last_fetched_at && <> · updated {fmtRelative(row.link_last_fetched_at)}</>}
+        </p>
+      )}
+      {status === 'rejected' && (
+        <p style={{ margin: '0 0 8px', color: '#991b1b' }} role="status">
+          Your manager did not verify @{row.link_handle}: {row.link_rejected_reason}
+        </p>
+      )}
+
+      {showInput && (
+        <form onSubmit={save} style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: status ? 0 : 4 }}>
+          <label htmlFor="tiktok-link-input" style={{ position: 'absolute', left: -9999 }}>
+            TikTok handle or profile link
+          </label>
+          <input
+            id="tiktok-link-input"
+            value={input}
+            onChange={(e) => setInput(e.target.value)}
+            placeholder="@yourname or https://www.tiktok.com/@yourname"
+            style={{ flex: '1 1 240px', padding: '8px 10px', borderRadius: 6, border: '1px solid #d1d5db', fontSize: 14 }}
+          />
+          <button
+            type="submit"
+            disabled={saving || !input.trim()}
+            style={{
+              padding: '8px 16px', borderRadius: 6, border: 'none', background: '#0a0a0a', color: '#fff',
+              fontWeight: 600, fontSize: 14, cursor: saving ? 'wait' : 'pointer',
+            }}
+          >
+            {saving ? 'Saving…' : 'Save link'}
+          </button>
+        </form>
+      )}
+
+      {error && <p style={{ margin: '8px 0 0', color: '#b91c1c' }} role="alert">{error}</p>}
     </div>
   );
 }

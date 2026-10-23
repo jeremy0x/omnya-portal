@@ -412,7 +412,13 @@ function OverviewSection({ userRole }) {
     setMessage({ text: '', type: '' });
     try {
       const data = await callApi('/api/earnings/recalculate');
-      setMessage({ text: data?.message || 'Earnings recalculated successfully.', type: 'success' });
+      // bonusHeld: TikTok bonuses held for lack of verified views (spec 0002,
+      // AC-10). Only non zero while TIKTOK_VERIFIED_BONUS_ONLY is on.
+      const held = Number(data?.bonusHeld) || 0;
+      const heldNote = held > 0
+        ? ` ${held} TikTok bonus${held === 1 ? ' is' : 'es are'} held until the creator's views are verified through their linked profile.`
+        : '';
+      setMessage({ text: (data?.message || 'Earnings recalculated successfully.') + heldNote, type: 'success' });
       loadStats();
     } catch (err) {
       setMessage({ text: err.message, type: 'error' });

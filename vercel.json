@@ -3,6 +3,9 @@
   "functions": {
     "api/admin/config-status.js": {
       "includeFiles": "supabase/migrations/probes.json"
+    },
+    "api/cron/sync-tiktok-links.js": {
+      "maxDuration": 300
     }
   },
   "crons": [
@@ -17,6 +20,10 @@
     {
       "path": "/api/cron/refresh-oauth-tokens",
       "schedule": "30 3 * * *"
+    },
+    {
+      "path": "/api/cron/sync-tiktok-links",
+      "schedule": "15 */6 * * *"
     }
   ],
   "headers": [
