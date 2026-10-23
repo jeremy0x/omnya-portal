@@ -30,8 +30,10 @@ _These are recommendations to keep your build orderly, not requirements. Skip an
 | 11 | Data retention and deletion | Slice 2 | planned |
 | 12 | Responsive and accessibility QA | Slice 2 | planned |
 | 13 | Go live evidence and sign off | Slice 2 | planned |
+| 14 | TikTok profile link tracking | Slice 1 | in-progress |
 | G | UGC dashboards | Deferred | in-progress |
 | H | Shared migration credentials | Deferred | planned |
+| I | Align connection status CHECK | Deferred | planned |
 
 ## Already built
 
@@ -97,6 +99,21 @@ Earnings, bonuses, withdrawals, batches, export and mark paid are built, but the
 **Done when:** one creator goes from earned to paid in production by a manual method, the ledger reconciles (payments equal earnings, batch totals match), and the payout acceptance test passes against the live database.
 - [ ] Design it (spec): `/architect live payout run`
 
+### 14. TikTok profile link tracking · in-progress
+A creator pastes their TikTok profile link instead of going through OAuth. The link is saved, and a background job runs every few hours to pull their public videos (views, likes, comments) and follower count. OAuth stays as an optional upgrade. This gets TikTok working without waiting on TikTok's test account limit (see #3).
+**Done when:** a creator saves a valid TikTok profile link, a manager verifies they own it, the scheduled job then pulls public stats for each of their videos into analytics, and only verified links count toward earnings. A link that can't be fetched (private, deleted, blocked) is marked for attention and does not fail silently.
+spec [0002](../specs/0002-tiktok-profile-link-tracking/index.md) · code in `api/tiktok-link/`, `api/cron/sync-tiktok-links.js`, `api/_utils/tiktokPublic.js`, `api/_utils/tiktokLink.js`
+- [x] Design it (spec): `/architect tiktok profile link tracking`
+- [ ] Build it: `/develop tiktok profile link tracking`
+  - [ ] One creator end to end: provider fixtures, migration, adapter, save, review, 6 hour cron with bio check and matching, bonus hold behind the flag, proven live (AC-1, AC-2, AC-3, AC-4, AC-5, AC-6, AC-7, AC-8, AC-10, AC-13, AC-17, AC-19)
+  - [ ] Review workflow: Check now, the creator card in every state, Remove, the manager's TikTok links tab, verified and rejected emails (AC-4, AC-5, AC-6, AC-14, AC-15, AC-16)
+  - [ ] Failure handling: link health rules, provider wide abort, ScrapeCreators in System Config (AC-11, AC-12)
+  - [ ] OAuth convergence and housekeeping: OAuth writes verified views, metrics thinning, RLS visibility tests (AC-9, AC-17, AC-18, AC-20)
+- [ ] Verify it: `/check verify tiktok profile link tracking`
+- [ ] Test it: `/test tiktok profile link tracking`
+- [ ] Review it (fresh model): `/check review tiktok profile link tracking`
+- [ ] Document it: `/document tiktok profile link tracking`
+
 ## Slice 2: Thicken the thread
 
 ### 6. Remaining platforms live · in-progress · needs a decision
@@ -148,6 +165,9 @@ Calendar, creator leaderboard, top posts and posts gallery are built on `feat/ug
 
 ### H. Shared migration credentials · planned · from spec 0001
 Put the DB password and `.env.migrate` values in a team password vault so a second person can run `npm run db:migrate`. Today only one laptop can.
+
+### I. Align the connection status CHECK on fresh databases · planned · from spec 0002
+`20260604000000_tiktok_integration.sql` creates the `connection_status` CHECK without `sync_failed` and `expired`, but production accepts both. A fresh database (PGlite tests, the restore drill in #2) rejects the `sync_failed` write in the analytics sync. A small migration should align the CHECK with production.
 
 ## Legend
 
