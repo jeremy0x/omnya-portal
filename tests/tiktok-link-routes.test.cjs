@@ -477,11 +477,11 @@ const daysAgo = (d) => new Date(Date.now() - d * 86400000).toISOString();
   seed();
   const old = daysAgo(30);
   db.tables.submissions = [
-    { id: 's-tt-held', creator_id: 'cr-a', campaign_id: 'ca', final_status: 'Approved', posted_at: old,
+    { id: 's-tt-held', creator_id: 'cr-a', campaign_id: 'ca', status: 'Approved', posted_at: old,
       platform: 'TikTok', posted_link: 'https://www.tiktok.com/@a/video/1', view_count_submitted: 500000, view_count_verified: 0, view_count_verified_at: null },
-    { id: 's-tt-ok', creator_id: 'cr-a', campaign_id: 'ca', final_status: 'Approved', posted_at: old,
+    { id: 's-tt-ok', creator_id: 'cr-a', campaign_id: 'ca', status: 'Approved', posted_at: old,
       platform: 'TikTok', posted_link: 'https://www.tiktok.com/@a/video/2', view_count_submitted: 900000, view_count_verified: 120000, view_count_verified_at: old },
-    { id: 's-ig', creator_id: 'cr-a', campaign_id: 'ca', final_status: 'Approved', posted_at: old,
+    { id: 's-ig', creator_id: 'cr-a', campaign_id: 'ca', status: 'Approved', posted_at: old,
       platform: 'Instagram', posted_link: 'https://www.instagram.com/reel/x', view_count_submitted: 500000, view_count_verified: 0 },
   ];
   db.tables.creator_earnings = [];
@@ -494,11 +494,11 @@ const daysAgo = (d) => new Date(Date.now() - d * 86400000).toISOString();
 
   seed();
   db.tables.submissions = JSON.parse(JSON.stringify([
-    { id: 's-tt-held', creator_id: 'cr-a', campaign_id: 'ca', final_status: 'Approved', posted_at: old,
+    { id: 's-tt-held', creator_id: 'cr-a', campaign_id: 'ca', status: 'Approved', posted_at: old,
       platform: 'TikTok', posted_link: 'https://www.tiktok.com/@a/video/1', view_count_submitted: 500000, view_count_verified: 0, view_count_verified_at: null },
-    { id: 's-tt-ok', creator_id: 'cr-a', campaign_id: 'ca', final_status: 'Approved', posted_at: old,
+    { id: 's-tt-ok', creator_id: 'cr-a', campaign_id: 'ca', status: 'Approved', posted_at: old,
       platform: 'TikTok', posted_link: 'https://www.tiktok.com/@a/video/2', view_count_submitted: 900000, view_count_verified: 120000, view_count_verified_at: old },
-    { id: 's-ig', creator_id: 'cr-a', campaign_id: 'ca', final_status: 'Approved', posted_at: old,
+    { id: 's-ig', creator_id: 'cr-a', campaign_id: 'ca', status: 'Approved', posted_at: old,
       platform: 'Instagram', posted_link: 'https://www.instagram.com/reel/x', view_count_submitted: 500000, view_count_verified: 0 },
   ]));
   db.tables.creator_earnings = [];

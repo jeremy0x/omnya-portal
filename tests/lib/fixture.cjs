@@ -130,7 +130,7 @@ async function setupTenants() {
     fx.campaignIds.push(t.campaign);
 
     t.submission = (await post('submissions', { creator_id: t.creator, campaign_id: t.campaign,
-      submission_type: 'Final Post', concept_status: 'Approved', final_status: 'Approved',
+      submission_type: 'Final Post', status: 'Approved',
       platform: 'TikTok', posted_link: `https://tiktok.com/@${letter}/video/1` }))[0].id;
 
     fx.tenants.push(t);

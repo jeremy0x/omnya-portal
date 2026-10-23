@@ -40,7 +40,8 @@ const R = (ok, label, detail = '') => {
       'schema guard rejects a bad column name',
       'and suggests "feedback" — the mistake made 3x in the audit');
   }
-  await assertColumns('submissions', ['feedback', 'final_status', 'concept_status']);
+  // final_status / concept_status were replaced by `status` (20260826000000).
+  await assertColumns('submissions', ['feedback', 'status']);
   R(true, 'schema guard accepts the real column names');
 
   const fx = await setup();
@@ -76,7 +77,7 @@ const R = (ok, label, detail = '') => {
     {
       const sub = (await require('./lib/fixture.cjs').post('submissions', {
         creator_id: fx.ids.creator, campaign_id: fx.ids.campaign,
-        submission_type: 'Final Post', concept_status: 'Approved', final_status: 'Pending',
+        submission_type: 'Final Post', status: 'Under Review',
         platform: 'TikTok', posted_link: 'https://tiktok.com/@t/video/1',
       }))[0];
 
@@ -100,9 +101,9 @@ const R = (ok, label, detail = '') => {
         await page.waitForTimeout(3500);
 
         // Schema-checked read: a typo here throws instead of faking a bug.
-        const row = await selectOne('submissions', ['final_status', 'feedback'], `id=eq.${sub.id}`);
-        R(row && /revision/i.test(row.final_status || ''), 'the revision state persisted',
-          row ? `final_status="${row.final_status}"` : 'row missing');
+        const row = await selectOne('submissions', ['status', 'feedback'], `id=eq.${sub.id}`);
+        R(row && /revision/i.test(row.status || ''), 'the revision state persisted',
+          row ? `status="${row.status}"` : 'row missing');
         R(row && (row.feedback || '').includes('re-shoot the opening'), 'the feedback text persisted',
           row ? `"${String(row.feedback).slice(0, 42)}"` : '');
       }

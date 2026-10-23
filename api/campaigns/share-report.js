@@ -51,7 +51,7 @@ module.exports = async (req, res) => {
   // 3. Fetch Approved Submissions
   const { data: rawSubmissions, error: sErr } = await supabase
     .from('submissions')
-    .select('id, creator_id, platform, posted_link, concept_status, status, approved_date, created_at, views_24h, views_72h, views_1w, views_2w, views_1m, likes, comments, shares, saves')
+    .select('id, creator_id, platform, posted_link, status, approved_date, created_at, views_24h, views_72h, views_1w, views_2w, views_1m, likes, comments, shares, saves')
     .eq('campaign_id', campaign.id)
     .eq('status', 'Approved');
 

@@ -122,15 +122,6 @@ async function build() {
     if (fs.existsSync(p)) await db.exec(read(p));
   }
 
-  // KNOWN DEFECT, NOT THIS MIGRATION'S: 20260826000000 drops
-  // submissions.concept_status and final_status, but the AFTER UPDATE trigger
-  // from 20260823000000 (audit_submission_review) still reads both, so EVERY
-  // update of a submission fails with "record new has no field
-  // concept_status". Confirmed on the live database 2026-10-23. Dropped here
-  // so this suite measures spec 0002 rather than that bug; remove these two
-  // lines once a migration rewrites the trigger against `status`.
-  await db.exec(`DROP TRIGGER IF EXISTS trg_audit_submission_review ON public.submissions;`);
-
 
   // The N-20 signup trigger copies auth.users.email into user_profiles, so
   // every seeded user carries an email and gets its profile row from there.

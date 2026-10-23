@@ -48,16 +48,18 @@ module.exports = async (req, res) => {
     // -------------------------------------------------------------------------
     // STEP 1 — Fetch all fully-approved submissions.
     //
-    // final_status has no CHECK constraint; the codebase canonically writes
-    // 'Approved' (capital A). The IN clause also covers lower-case variants
-    // that may exist from earlier manual data entry.
+    // 20260826000000 replaced final_status (and concept_status) with one
+    // `status` column under a CHECK, and dropped the old ones, so filtering on
+    // final_status failed every run with 42703. `status` is constrained, so
+    // the old lower-case variants cannot occur. 'Published/Tracked' comes
+    // after 'Approved' in that lifecycle and is still an approved video.
     // creator_id and campaign_id are direct columns on submissions, so no join
     // to campaigns is required.
     // -------------------------------------------------------------------------
     const { data: approvedSubmissions, error: fetchError } = await supabase
       .from('submissions')
       .select(tiktokVerifiedOnly ? HOLD_SELECT : BASE_SELECT)
-      .in('final_status', ['Approved', 'approved', 'final_approved', 'completed'])
+      .in('status', ['Approved', 'Published/Tracked'])
       .not('creator_id', 'is', null);
 
     if (fetchError) {
