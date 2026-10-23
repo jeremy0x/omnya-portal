@@ -270,7 +270,8 @@ export default function CreatorEarnings({ user, db }) {
           .from("submissions")
           .select("*, campaigns(name, client_id)")
           .eq("creator_id", creator.id)
-          .eq("final_status", "Approved")
+          // final_status was dropped by 20260826000000; `status` replaced it.
+          .in("status", ["Approved", "Published/Tracked"])
           .order("created_at", { ascending: false });
         if (error) throw error;
         setBonusSubs(data || []);

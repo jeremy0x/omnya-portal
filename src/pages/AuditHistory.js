@@ -60,7 +60,7 @@ const ICON = {
   campaign_archived: '🗄', campaign_restored: '↩',
   client_archived: '🗄', client_restored: '↩',
   account_manager_archived: '🗄', account_manager_restored: '↩',
-  concept_review: '📽', final_review: '🎬',
+  concept_review: '📽', final_review: '🎬', submission_review: '🎬',
   payment_voided: '🚫',
   approve_withdrawal: '✅', reject_withdrawal: '✕', withdrawal_requested: '💸',
   batch_created: '📦', batch_marked_paid: '💰', export_batch: '📤',

@@ -57,6 +57,9 @@ function describe(row) {
       return `${who} set a concept to ${row.to_value}`;
     case 'final_review':
       return `${who} set a final to ${row.to_value}`;
+    // Since 20261023000001: one action for the unified `status` column.
+    case 'submission_review':
+      return `${who} set a submission to ${row.to_value}`;
     case 'payment_voided':
       return `${who} voided a payment`;
     case 'approve_withdrawal':

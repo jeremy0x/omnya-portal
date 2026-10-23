@@ -94,7 +94,7 @@ const rpc = async (fn, args, token) => {
     // A posted video old enough to qualify for the view bonus.
     await post('submissions', {
       creator_id: CID, campaign_id: fx.ids.campaign,
-      submission_type: 'Final Post', concept_status: 'Approved', final_status: 'Approved',
+      submission_type: 'Final Post', status: 'Approved',
       platform: 'TikTok', posted_link: 'https://tiktok.com/@t/video/1',
       posted_url: 'https://tiktok.com/@t/video/1',
       posted_at: new Date(Date.now() - 15 * 86400000).toISOString(),

@@ -109,5 +109,14 @@
   "20261001000000_admin_migration_status.sql": {
     "label": "Migration status function",
     "kind": "function", "signature": "public.admin_migration_status(jsonb)"
+  },
+  "20261023000000_tiktok_profile_links.sql": {
+    "label": "TikTok profile link tracking",
+    "kind": "function", "signature": "public.apply_verified_views(uuid, bigint, text, uuid, text)"
+  },
+  "20261023000001_fix_submission_review_audit.sql": {
+    "label": "Submission review audit reads status",
+    "kind": "function_body", "signature": "public.audit_submission_review()",
+    "marker": "'submission_review'"
   }
 }
