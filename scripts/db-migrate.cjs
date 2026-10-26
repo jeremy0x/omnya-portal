@@ -207,11 +207,26 @@ async function prerequisites(sys, args) {
 }
 
 // pg_dump on PATH whose major is >= the server's (no Docker needed); else
-// `supabase db dump`, which runs pg_dump inside Docker; else stop.
+// check standard Windows install locations; else `supabase db dump`, which
+// runs pg_dump inside Docker; else stop.
 function pickDumpTool(sys, serverMajor) {
-  const pd = sys.exec('pg_dump', ['--version']);
-  const m = pd.status === 0 && outputOf(pd).match(/(\d+)(?:\.\d+)?/);
-  if (m && Number(m[1]) >= serverMajor) return { kind: 'pg_dump', version: m[0] };
+  let pd = sys.exec('pg_dump', ['--version']);
+  let m = pd.status === 0 && outputOf(pd).match(/(\d+)(?:\.\d+)?/);
+  let bin = 'pg_dump';
+  if (!m && process.platform === 'win32') {
+    const candidates = [
+      `C:\\Program Files\\PostgreSQL\\${serverMajor}\\bin\\pg_dump.exe`,
+      `C:\\Program Files\\PostgreSQL\\17\\bin\\pg_dump.exe`,
+    ];
+    for (const c of candidates) {
+      if (fs.existsSync(c)) {
+        pd = sys.exec(c, ['--version']);
+        m = pd.status === 0 && outputOf(pd).match(/(\d+)(?:\.\d+)?/);
+        if (m) { bin = c; break; }
+      }
+    }
+  }
+  if (m && Number(m[1]) >= serverMajor) return { kind: 'pg_dump', version: m[0], bin };
   const docker = sys.exec('docker', ['info']);
   if (docker.status === 0) return { kind: 'supabase', version: 'docker' };
   throw new Refusal(
@@ -256,7 +271,7 @@ function backup(sys, ctx, dumpTool, stamp) {
         PGPASSWORD: t.password, PGDATABASE: t.database, PGSSLMODE: 'require' };
       const args = [dataOnly ? '--data-only' : '--schema-only',
         ...DUMP_SCHEMAS.flatMap((s) => ['--schema', s]), '--file', file];
-      return sys.exec('pg_dump', args, { env });
+      return sys.exec(dumpTool.bin || 'pg_dump', args, { env });
     }
     const args = ['db', 'dump', '--db-url', ctx.url, '--schema', DUMP_SCHEMAS.join(','), '--file', file];
     if (dataOnly) args.push('--data-only');

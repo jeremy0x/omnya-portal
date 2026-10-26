@@ -1803,12 +1803,17 @@ function SubmitContent({ user, db, onRefresh, setPage, isOverride = false }) {
       }
     }
 
+    const postedUrl = (form.type === "Final" && uploadMode === "link")
+      ? fileLink
+      : (form.posted_link || null);
+
     const newSub = {
       creator_id: creator.id, campaign_id: form.campaign_id,
       submission_type: form.type, concept_link: fileLink,
       status: "Pending",
-      status: form.type==="Final"?"Pending":null,
-      posted_link: form.posted_link||null, platform: form.platform,
+      posted_link: postedUrl,
+      posted_url: postedUrl,
+      platform: form.platform,
       payment_status: "Unpaid",
       // An override submission says so in its own notes, so nobody reading the
       // review queue later has to wonder why the creator has no record of
@@ -1819,8 +1824,27 @@ function SubmitContent({ user, db, onRefresh, setPage, isOverride = false }) {
       due_date: form.due_date||null
     };
 
-    const { error } = await supabase.from("submissions").insert(newSub);
+    const { data: insertedSub, error } = await supabase.from("submissions").insert(newSub).select().single();
     if (error) { setErr(error.message); setSubmitting(false); setUploadProgress(0); return; }
+
+    if (postedUrl && insertedSub?.id) {
+      (async () => {
+        try {
+          const { data: sessionData } = await supabase.auth.getSession();
+          const token = sessionData?.session?.access_token;
+          if (token) {
+            await fetch("/api/analytics/manual-sync", {
+              method: "POST",
+              headers: {
+                "Content-Type": "application/json",
+                Authorization: `Bearer ${token}`
+              },
+              body: JSON.stringify({ submissionId: insertedSub.id })
+            });
+          }
+        } catch (_) {}
+      })();
+    }
 
     // Email: notify AM about new submission
     try {
