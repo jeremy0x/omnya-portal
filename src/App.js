@@ -3,7 +3,7 @@ import { useState, useEffect, useCallback, useRef, useMemo } from "react";
 import React from "react";
 import { supabase, SUPABASE_URL } from "./supabaseClient";
 import { getAvatarColor, getInitials, fmtDate, fmtMoney, fmtNum, statusBadge, scoreColor, fmtCompactNum, fmtRelativeTime, platformMeta, calcPacing, isBreakoutVideo } from "./utils";
-const Legal = React.lazy(() => import('./Legal'));
+const Legal = React.lazy(() => import('./pages/Legal'));
 const Landing = React.lazy(() => import('./pages/Landing'));
 const CreatorDashboard = React.lazy(() => import('./pages/CreatorDashboard'));
 const ClientDashboard = React.lazy(() => import('./pages/ClientDashboard'));
@@ -13,8 +13,8 @@ const ClientCampaignsPage = React.lazy(() =>
 const ClientContentGallery = React.lazy(() =>
   import('./pages/ClientDashboard').then(m => ({ default: m.ClientContentGallery }))
 );
-const CreatorConnections = React.lazy(() => import('./CreatorConnections'));
-const AnalyticsDashboard = React.lazy(() => import('./AnalyticsDashboard'));
+const CreatorConnections = React.lazy(() => import('./pages/CreatorConnections'));
+const AnalyticsDashboard = React.lazy(() => import('./pages/AnalyticsDashboard'));
 const CreatorEarningsPage = React.lazy(() => import('./components/CreatorEarnings'));
 const PayoutManager = React.lazy(() => import('./components/PayoutManager'));
 // Owner administration (scope §6.1 / §5.2). Lazy for the same reason as the

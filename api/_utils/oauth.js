@@ -180,7 +180,7 @@ function finishOAuth(res, baseUrl, result) {
 // fails on the PROVIDER's error page, where the portal cannot explain it.
 //
 // TikTok's default is /api/auth/tiktok/callback because that is the path
-// SOCIAL_MEDIA_INTEGRATION.md tells the operator to register. The integrations
+// docs/guides/social-media-integration.md tells the operator to register. The integrations
 // route used to default to /api/integrations/tiktok/callback instead, so a
 // console set up from the docs never matched what the Connect button sent.
 function appBaseUrl() {

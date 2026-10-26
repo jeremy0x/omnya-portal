@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
-import { supabase } from './supabaseClient';
-import LoadingSpinner from './components/LoadingSpinner';
+import { supabase } from '../supabaseClient';
+import LoadingSpinner from '../components/LoadingSpinner';
 
 // F-13. One page, one card, one API family.
 //

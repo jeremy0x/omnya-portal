@@ -149,7 +149,7 @@ The creator's own card state is read in the browser from `creator_social_account
 | recalculate | hold flag | env `TIKTOK_VERIFIED_BONUS_ONLY === 'true'` |
 | config test | credit balance | ScrapeCreators `/v1/credit/balance` |
 | config test | low balance threshold | constant 2,000 credits |
-| creator card | plain words for each `link_last_error` | a fixed map in `src/CreatorConnections.js` (`profile_not_found`, `profile_private`, `fetch_failed`) |
+| creator card | plain words for each `link_last_error` | a fixed map in `src/pages/CreatorConnections.js` (`profile_not_found`, `profile_private`, `fetch_failed`) |
 
 **Key invariants**:
 - One verified owner per handle (partial unique index, case insensitive).

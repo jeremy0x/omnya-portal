@@ -16,7 +16,7 @@
 // tokens, and its callback is the one that actually stores a connection.
 //
 // The UI no longer calls it directly. src/TikTokConnect.js has been deleted and
-// TikTok is now a fourth card in src/CreatorConnections.js on the same
+// TikTok is now a fourth card in src/pages/CreatorConnections.js on the same
 // /api/auth/{platform}/start flow as Instagram, Facebook and YouTube — which
 // reaches api/integrations/tiktok/connect.js through the delegation below.
 //
@@ -24,7 +24,7 @@
 //
 // Every TikTok route takes its redirect URI from redirectUriFor('tiktok') in
 // api/_utils/oauth.js, which defaults to ${APP_BASE_URL}/api/auth/tiktok/callback
-// -- this path -- because that is the one SOCIAL_MEDIA_INTEGRATION.md tells the
+// -- this path -- because that is the one docs/guides/social-media-integration.md tells the
 // operator to register in the TikTok developer console.
 //
 // It used to be worse than ambiguous. api/integrations/tiktok/connect.js (what

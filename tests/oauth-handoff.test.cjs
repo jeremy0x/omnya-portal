@@ -63,7 +63,7 @@ const COOP = header('Cross-Origin-Opener-Policy');
 const { oauthCompleteUrl } = require(path.join(ROOT, 'api/_utils/oauth'));
 
 // A stand-in for the portal tab. It speaks exactly the protocol
-// src/CreatorConnections.js speaks — same channel, same ack — from an external
+// src/pages/CreatorConnections.js speaks — same channel, same ack — from an external
 // script, because under this CSP an inline one would not run.
 const PORTAL_HTML = `<!doctype html><title>portal</title><button id="go">connect</button><script src="/portal-stub.js"></script>`;
 const PORTAL_JS = `

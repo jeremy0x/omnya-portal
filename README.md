@@ -1,63 +1,32 @@
-# Omnya Portal - Environment Variables
+# Omnya Portal
 
-This project requires several environment variables to function correctly. These variables are used for authentication, API integrations, and database connections.
+Creator, client and staff portal for a UGC agency: campaigns, content submissions, social analytics, creator earnings and payouts.
 
-## Supabase
+React SPA (Create React App) + Vercel serverless functions in `api/` + Supabase (Postgres, Auth, Storage).
 
-- `SUPABASE_URL`: The URL of your Supabase project (e.g., `https://your-project.supabase.co`).
-- `SUPABASE_ANON_KEY`: The anonymous public key from your Supabase project settings (Project Settings -> API).
-- `SUPABASE_SERVICE_ROLE_KEY`: (Optional for server-side functions) The service role key with elevated privileges. **Do not expose this in client-side code.**
-
-## Social Media APIs
-
-To enable analytics fetching for creators, you need to set up developer apps for the respective platforms and obtain API keys/tokens.
-
-- `TIKTOK_CLIENT_KEY`: Your TikTok Developer App Key.
-- `TIKTOK_CLIENT_SECRET`: Your TikTok Developer App Secret.
-- `INSTAGRAM_APP_KEY`: Your Instagram/Meta App Key.
-- `INSTAGRAM_APP_SECRET`: Your Instagram/Meta App Secret.
-- `YOUTUBE_API_KEY`: Your Google Cloud Console Project API Key (enabled for YouTube Data API v3).
-- `FACEBOOK_APP_KEY`: Your Facebook/Meta App Key.
-- `FACEBOOK_APP_SECRET`: Your Facebook/Meta App Secret.
-
-## Email (Resend)
-
-- `RESEND_API_KEY`: Your Resend API key for sending transactional emails.
-
-## Anthropic (AI)
-
-- `ANTHROPIC_API_KEY`: Your Anthropic API key for AI features (Video Insights).
-
----
-
-## Adding Variables to Vercel
-
-1.  Go to your project dashboard on [Vercel](https://vercel.com).
-2.  Select your project.
-3.  Go to **Settings** -> **Environment Variables**.
-4.  Add each variable with its corresponding value.
-5.  Ensure you add `SUPABASE_URL` and `SUPABASE_ANON_KEY` as **Production**, **Development**, and **Preview** variables so they are available in all environments.
-6.  For server-side functions (like `/api/analytics`), you may also need to add `SUPABASE_SERVICE_ROLE_KEY` and any other secret keys.
-7.  Redeploy your project (or push a new commit) to ensure the new environment variables are loaded.
-
-## Database Setup
-
-To set up the required tables and security policies in Supabase:
-
-1.  Open the [database_setup.sql](database_setup.sql) file in this repository.
-2.  Copy its contents.
-3.  Go to your Supabase project -> **SQL Editor**.
-4.  Paste the SQL and click **Run**.
-
----
-
-## Local Development
-## Local Development
-
-Create a `.env.local` file in the root directory (if not already present) to store these variables locally:
+## Getting started
 
 ```bash
-SUPABASE_URL=...
-SUPABASE_ANON_KEY=...
-# Add other keys as needed
+npm install
+cp .env.example .env          # fill in values; see comments in the file
+npm start                     # SPA on :3000 (does not serve /api/*)
+node tests/lib/devServer.cjs  # /api/* on :3100, proxies the rest to :3000
 ```
+
+Database schema lives in `supabase/migrations/`; apply with `npm run db:migrate` (see `supabase/migrations/README.md`).
+
+## Layout
+
+| Path | What |
+|---|---|
+| `src/` | React app (`App.js` routes by page state; screens in `pages/`, shared UI in `components/`) |
+| `api/` | Vercel functions, one file per route; helpers in `_utils/` and `_lib/` |
+| `supabase/` | Migrations, rollbacks, PGlite migration tests |
+| `tests/` | Custom Node test harness (`node tests/run-all.cjs`) |
+| `scripts/` | One-off ops scripts (migration runner, token backfill) |
+| `public/` | Static assets, legal pages, TikTok domain verification files |
+| `docs/guides/` | Deployment, security, payments and social integration guides |
+| `docs/specs/` | Feature specs |
+| `docs/reports/` | Dated audit and status snapshots (historical) |
+
+Contributor and agent conventions: [AGENTS.md](AGENTS.md).

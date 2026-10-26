@@ -1,6 +1,6 @@
 # Vercel Environment Variables Guide
 
-> **SECURITY NOTICE — read [SECURITY_NOTES.md](./SECURITY_NOTES.md) first.**
+> **SECURITY NOTICE — read [security-notes.md](./security-notes.md) first.**
 > Earlier revisions of this file contained live Supabase anon and service-role keys.
 > Those keys are in git history and **must be rotated** in Supabase before this
 > repository is shared, deployed, or trusted again. Never paste live secrets back

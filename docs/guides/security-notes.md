@@ -3,7 +3,7 @@
 This file documents the security model of the portal, which keys are safe to
 expose, which must stay secret, and how to recover when something leaks.
 
-It is intentionally short. The full risk register lives in [AUDIT.md](./AUDIT.md).
+It is intentionally short. The full risk register lives in [audit.md](../reports/audit.md).
 
 ---
 
@@ -12,7 +12,7 @@ It is intentionally short. The full risk register lives in [AUDIT.md](./AUDIT.md
 | Status | Item |
 |---|---|
 | URGENT | The Supabase **service-role key** and **anon key** were committed in `VERCEL_DEPLOY.md` revision history. **Both must be rotated in Supabase** before the project can be considered safe. |
-| URGENT | RLS policies on every table are `USING (true)` — see [AUDIT.md §4.2](./AUDIT.md#42-rls-matrix). Until those are tightened, the anon key (which is in every client bundle by design) is effectively a master key. |
+| URGENT | RLS policies on every table are `USING (true)` — see [AUDIT.md §4.2](../reports/audit.md#42-rls-matrix). Until those are tightened, the anon key (which is in every client bundle by design) is effectively a master key. |
 | Improved | Hardcoded anon-key fallbacks were removed from `src/supabaseClient.js`, `src/AnalyticsDashboard.js`, `src/CreatorConnections.js`, `src/PayoutManager.js`, `src/pages/CreatorDashboard.js`. The client now fails loudly if env vars are missing. |
 | Improved | `VERCEL_DEPLOY.md` no longer contains live keys. Placeholders only. |
 | Open | API endpoints (`mark-paid`, `export`, `send-email`, `get-upload-url`, `upload-to-drive`) still lack proper server-side authorization — see AUDIT.md §3 and the Phase 4 plan. |
