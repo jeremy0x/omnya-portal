@@ -113,6 +113,7 @@ module.exports = async (req, res) => {
 
     if (postedUrl !== undefined && postedUrl !== null && postedUrl !== '') {
       updatePayload.posted_url = postedUrl;
+      updatePayload.posted_link = postedUrl;
     }
     if (parsedPostedAt !== undefined) {
       updatePayload.posted_at = parsedPostedAt.toISOString();

@@ -63,12 +63,14 @@ function normalizePlatformLabel(label) {
 // only fail — so the URL wins and the label is the fallback.
 function resolvePlatform(sub) {
   if (!sub) return null;
-  return detectPlatformFromUrl(sub.posted_link) || normalizePlatformLabel(sub.platform);
+  const link = sub.posted_link || sub.posted_url || sub.concept_link;
+  return detectPlatformFromUrl(link) || normalizePlatformLabel(sub.platform);
 }
 
 function extractTikTokVideoId(url) {
-  // /@user/video/<id>, and /@user/photo/<id> for photo-mode posts.
-  const m = url.match(/\/(?:video|photo)\/(\d+)/);
+  if (!url || typeof url !== 'string') return null;
+  // /@user/video/<id>, /@user/photo/<id>, /v/<id>, and ?item_id=<id>
+  const m = url.match(/\/(?:video|photo|v)\/(\d+)/i) || url.match(/[?&]item_id=(\d+)/i);
   return m ? m[1] : null;
 }
 
@@ -484,7 +486,8 @@ async function syncSubmissions(supabase, submissions) {
       summary.errors.push({ submission_id: sub.id, reason: 'missing_user_id' });
       continue;
     }
-    const link = await resolveShortLink(sub.posted_link);
+    const rawLink = sub.posted_link || sub.posted_url || sub.concept_link;
+    const link = await resolveShortLink(rawLink);
     const platform = resolvePlatform({ ...sub, posted_link: link });
     if (!platform) {
       summary.skipped += 1;
@@ -499,7 +502,7 @@ async function syncSubmissions(supabase, submissions) {
     }
     const key = `${userId}_${platform}`;
     if (!groups.has(key)) groups.set(key, { userId, platform, submissions: [] });
-    groups.get(key).submissions.push({ ...sub, videoId, user_id: userId });
+    groups.get(key).submissions.push({ ...sub, videoId, user_id: userId, posted_link: link });
   }
 
   // 2. Fetch tokens for all needed (user_id, platform) pairs.
@@ -546,6 +549,10 @@ async function syncSubmissions(supabase, submissions) {
   for (const { userId, platform, submissions: groupSubs } of groups.values()) {
     const account = tokenIndex.get(`${userId}_${platform}`);
     if (!account) {
+      if (platform === 'tiktok' && process.env.SCRAPECREATORS_API_KEY) {
+        await syncTikTokPublicGroup(supabase, groupSubs, userId, summary);
+        continue;
+      }
       summary.skipped += groupSubs.length;
       for (const s of groupSubs) summary.errors.push({ submission_id: s.id, reason: 'no_token' });
       continue;
@@ -557,6 +564,10 @@ async function syncSubmissions(supabase, submissions) {
     // provider refusal it flags the row for reconnect rather than discarding it.
     const refresh = await refreshIfNeeded(account, { supabase });
     if (!refresh.accessToken) {
+      if (platform === 'tiktok' && process.env.SCRAPECREATORS_API_KEY) {
+        await syncTikTokPublicGroup(supabase, groupSubs, userId, summary);
+        continue;
+      }
       summary.failed += groupSubs.length;
       const reason = refresh.status === 'failed'
         ? `token_refresh_failed: ${refresh.error}`
@@ -639,6 +650,29 @@ async function syncSubmissions(supabase, submissions) {
       } else {
         summary.updated += 1;
         successes += 1;
+        try {
+          await supabase
+            .from('submissions')
+            .update({
+              likes: result.likes || 0,
+              comments: result.comments || 0,
+              shares: result.shares || 0,
+              saves: result.saves || 0,
+              views_24h: result.views || 0,
+              analytics_synced_at: new Date().toISOString(),
+            })
+            .eq('id', sub.id);
+
+          if (platform === 'tiktok') {
+            await supabase.rpc('apply_verified_views', {
+              p_submission_id: sub.id,
+              p_views: result.views || 0,
+              p_source: 'oauth',
+              p_user_id: userId,
+              p_handle: null,
+            });
+          }
+        } catch (_) {}
       }
     }
 
@@ -677,11 +711,90 @@ async function syncSubmissions(supabase, submissions) {
 }
 
 // -----------------------------------------------------------------------------
+// Public TikTok sync fallback (ScrapeCreators)
+// -----------------------------------------------------------------------------
+
+async function syncTikTokPublicGroup(supabase, groupSubs, userId, summary) {
+  const { getVideo } = require('./tiktokPublic');
+  for (const sub of groupSubs) {
+    summary.processed += 1;
+    const url = sub.posted_link || sub.posted_url || sub.concept_link;
+    const video = await getVideo(url);
+    if (video.error) {
+      summary.failed += 1;
+      summary.errors.push({ submission_id: sub.id, platform: 'tiktok', reason: video.error });
+      continue;
+    }
+
+    const engagementRate = calculateEngagementRate(video);
+    const row = {
+      user_id: userId,
+      creator_id: sub.creator_id,
+      submission_id: sub.id,
+      campaign_id: sub.campaign_id,
+      platform: 'tiktok',
+      video_id: video.id || sub.videoId,
+      video_url: url,
+      views: video.views || 0,
+      likes: video.likes || 0,
+      comments: video.comments || 0,
+      shares: video.shares || 0,
+      saves: video.saves || 0,
+      reach: 0,
+      engagement_rate: engagementRate,
+      raw_metrics: video.raw || {},
+      pulled_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    };
+    const upsertErr = await upsertVideoAnalytics(supabase, row);
+    if (upsertErr) {
+      summary.failed += 1;
+      summary.errors.push({ submission_id: sub.id, reason: `upsert_failed: ${upsertErr.message}` });
+      continue;
+    }
+
+    try {
+      await supabase
+        .from('submissions')
+        .update({
+          likes: video.likes || 0,
+          comments: video.comments || 0,
+          shares: video.shares || 0,
+          saves: video.saves || 0,
+          views_24h: video.views || 0,
+          analytics_synced_at: new Date().toISOString(),
+        })
+        .eq('id', sub.id);
+
+      const { data: acct } = await supabase
+        .from('creator_social_accounts')
+        .select('link_handle, link_status')
+        .eq('user_id', userId)
+        .eq('platform', 'tiktok')
+        .eq('link_status', 'verified')
+        .maybeSingle();
+
+      if (acct && acct.link_handle) {
+        await supabase.rpc('apply_verified_views', {
+          p_submission_id: sub.id,
+          p_views: video.views,
+          p_source: 'link',
+          p_user_id: userId,
+          p_handle: acct.link_handle,
+        });
+      }
+    } catch (_) {}
+
+    summary.updated += 1;
+  }
+}
+
+// -----------------------------------------------------------------------------
 // Submissions query helpers — used by both sync entry points.
 // -----------------------------------------------------------------------------
 
 const SUBMISSION_SELECT =
-  'id, creator_id, campaign_id, platform, posted_link, submission_type, creators!inner(user_id)';
+  'id, creator_id, campaign_id, platform, posted_link, posted_url, concept_link, submission_type, creators!inner(user_id)';
 
 async function fetchAllFinalSubmissions(supabase) {
   const { data, error } = await supabase
@@ -699,10 +812,14 @@ async function fetchSubmissionsByIds(supabase, submissionIds) {
   const { data, error } = await supabase
     .from('submissions')
     .select(SUBMISSION_SELECT)
-    .in('id', submissionIds)
-    .not('posted_link', 'is', null);
+    .in('id', submissionIds);
   if (error) throw new Error(`submissions_fetch_failed: ${error.message}`);
-  return data || [];
+  return (data || [])
+    .map((s) => ({
+      ...s,
+      posted_link: s.posted_link || s.posted_url || s.concept_link || null,
+    }))
+    .filter((s) => Boolean(s.posted_link));
 }
 
 async function fetchSubmissionsForUser(supabase, userId, platform) {
