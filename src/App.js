@@ -1687,7 +1687,16 @@ function SubmitContent({ user, db, onRefresh, setPage, isOverride = false }) {
   // below it, so the hook order changed the moment a creator record appeared —
   // which React treats as a fatal error, not a warning.
   const [overrideCreatorId, setOverrideCreatorId] = useState("");
-  const [form, setForm] = useState({campaign_id:"",type:"Concept",concept_link:"",posted_link:"",platform:"TikTok",comment:""});
+  const [form, setForm] = useState({
+    campaign_id: "",
+    type: "Concept",
+    concept_link: "",
+    posted_link: "",
+    platform: "TikTok",
+    handle: "",
+    comment: "",
+    due_date: "",
+  });
   const [file, setFile] = useState(null);
   const [uploadMode, setUploadMode] = useState("file"); // "file" or "link"
   const [submitting, setSubmitting] = useState(false);
@@ -1696,6 +1705,11 @@ function SubmitContent({ user, db, onRefresh, setPage, isOverride = false }) {
   const [err, setErr] = useState("");
   const successRef = useRef(false);
 
+  // Link verification state (spec 0003)
+  const [verifying, setVerifying] = useState(false);
+  const [verifyErr, setVerifyErr] = useState("");
+  const [verifiedVideo, setVerifiedVideo] = useState(null);
+
   const creator = isOverride
     ? db.creators.find(c=>c.id===overrideCreatorId)
     : ownCreator;
@@ -1703,6 +1717,96 @@ function SubmitContent({ user, db, onRefresh, setPage, isOverride = false }) {
   const myJobs = db.campaigns.filter(
     c=>(c.assigned_creators||[]).includes(creator?.id)&&c.status!=="Completed"&&c.status!=="Archived"
   );
+
+  const getProfileHandle = (platform) => {
+    if (!creator) return "";
+    const p = (platform || "").toLowerCase();
+    if (p === "tiktok") return creator.tiktok_handle || "";
+    if (p === "instagram") return creator.instagram_handle || "";
+    if (p === "youtube") return creator.youtube_handle || "";
+    return "";
+  };
+
+  // Pre-fill platform handle from creator profile when creator or platform changes
+  useEffect(() => {
+    if (creator) {
+      const defaultHandle = getProfileHandle(form.platform);
+      setForm(f => {
+        if (!f.handle && defaultHandle) {
+          return { ...f, handle: defaultHandle };
+        }
+        return f;
+      });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [creator?.id, form.platform]);
+
+  const handlePlatformChange = (newPlatform) => {
+    const oldDefault = getProfileHandle(form.platform);
+    const newDefault = getProfileHandle(newPlatform);
+    setForm(f => ({
+      ...f,
+      platform: newPlatform,
+      handle: (!f.handle || f.handle === oldDefault) ? newDefault : f.handle,
+    }));
+    setVerifiedVideo(null);
+    setVerifyErr("");
+  };
+
+  const verifyLink = async (targetUrl, targetHandle, targetPlatform) => {
+    const url = (targetUrl || form.concept_link || "").trim();
+    const handle = (targetHandle || form.handle || "").trim();
+    const platform = (targetPlatform || form.platform || "TikTok").trim();
+
+    if (!url) {
+      setVerifyErr("Please enter a video link first.");
+      return null;
+    }
+    if (!handle) {
+      setVerifyErr("Please enter your account handle to verify ownership.");
+      return null;
+    }
+
+    setVerifying(true);
+    setVerifyErr("");
+    try {
+      const { data: sessionData } = await supabase.auth.getSession();
+      const token = sessionData?.session?.access_token;
+      if (!token) {
+        setVerifyErr("Authentication required. Please refresh the page.");
+        setVerifying(false);
+        return null;
+      }
+
+      const res = await fetch("/api/social/verify-video-link", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ url, handle, platform }),
+      });
+
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        const msg = data?.error || data?.message || "Failed to verify video link.";
+        setVerifyErr(msg);
+        setVerifiedVideo(null);
+        setVerifying(false);
+        return null;
+      }
+
+      setVerifiedVideo(data.video || null);
+      setVerifyErr("");
+      setVerifying(false);
+      return data.video;
+    } catch (e) {
+      setVerifyErr(e.message || "Network error while verifying video link.");
+      setVerifiedVideo(null);
+      setVerifying(false);
+      return null;
+    }
+  };
 
   // Keep the selected campaign valid as the creator changes underneath it.
   useEffect(() => {
@@ -1787,6 +1891,10 @@ function SubmitContent({ user, db, onRefresh, setPage, isOverride = false }) {
     if (!form.campaign_id) { setErr("Please select a campaign"); return; }
     if (uploadMode==="file" && !file) { setErr("Please select a video file to upload"); return; }
     if (uploadMode==="link" && !form.concept_link) { setErr("Please enter a video link"); return; }
+    if (form.type === "Final" && uploadMode === "link" && !form.handle) {
+      setErr("Please enter your account handle to verify ownership");
+      return;
+    }
     
     setSubmitting(true); setErr(""); setUploadProgress(0);
 
@@ -1803,8 +1911,20 @@ function SubmitContent({ user, db, onRefresh, setPage, isOverride = false }) {
       }
     }
 
+    // For final link submissions, verify ownership if not already verified
+    let verified = verifiedVideo;
+    if (form.type === "Final" && uploadMode === "link") {
+      if (!verified) {
+        verified = await verifyLink(form.concept_link, form.handle, form.platform);
+        if (!verified) {
+          setSubmitting(false);
+          return;
+        }
+      }
+    }
+
     const postedUrl = (form.type === "Final" && uploadMode === "link")
-      ? fileLink
+      ? (verified?.url || fileLink)
       : (form.posted_link || null);
 
     const newSub = {
@@ -1827,7 +1947,28 @@ function SubmitContent({ user, db, onRefresh, setPage, isOverride = false }) {
     const { data: insertedSub, error } = await supabase.from("submissions").insert(newSub).select().single();
     if (error) { setErr(error.message); setSubmitting(false); setUploadProgress(0); return; }
 
-    if (postedUrl && insertedSub?.id) {
+    // Once inserted, stamp verified view metrics server side with service role
+    if (form.type === "Final" && uploadMode === "link" && insertedSub?.id) {
+      try {
+        const { data: sessionData } = await supabase.auth.getSession();
+        const token = sessionData?.session?.access_token;
+        if (token) {
+          await fetch("/api/social/verify-video-link", {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              Authorization: `Bearer ${token}`
+            },
+            body: JSON.stringify({
+              submissionId: insertedSub.id,
+              url: postedUrl,
+              handle: form.handle,
+              platform: form.platform
+            })
+          });
+        }
+      } catch (_) {}
+    } else if (postedUrl && insertedSub?.id) {
       (async () => {
         try {
           const { data: sessionData } = await supabase.auth.getSession();
@@ -1844,6 +1985,19 @@ function SubmitContent({ user, db, onRefresh, setPage, isOverride = false }) {
           }
         } catch (_) {}
       })();
+    }
+
+    // Save creator handle back to profile if not yet saved
+    if (form.type === "Final" && form.handle && creator?.id) {
+      const p = (form.platform || "").toLowerCase();
+      const cleanHandle = form.handle.trim().replace(/^@+/, "");
+      const patch = {};
+      if (p === "tiktok" && !creator.tiktok_handle) patch.tiktok_handle = cleanHandle;
+      if (p === "instagram" && !creator.instagram_handle) patch.instagram_handle = cleanHandle;
+      if (p === "youtube" && !creator.youtube_handle) patch.youtube_handle = cleanHandle;
+      if (Object.keys(patch).length > 0) {
+        supabase.from("creators").update(patch).eq("id", creator.id).then(() => {});
+      }
     }
 
     // Email: notify AM about new submission
@@ -1866,8 +2020,11 @@ function SubmitContent({ user, db, onRefresh, setPage, isOverride = false }) {
     setFile(null);
     setUploadProgress(0);
     setSubmitting(false);
-    setForm({campaign_id:myJobs[0]?.id||"",type:"Concept",concept_link:"",posted_link:"",platform:"TikTok",comment:""});
+    setForm({campaign_id:myJobs[0]?.id||"",type:"Concept",concept_link:"",posted_link:"",platform:"TikTok",handle:"",comment:"",due_date:""});
+    setVerifiedVideo(null);
+    setVerifyErr("");
     setSuccess(true);
+    if (onRefresh) onRefresh();
   };
 
   if (!creator) return <div className="content"><ErrorMsg msg="Creator profile not found." /></div>;
@@ -1981,17 +2138,131 @@ function SubmitContent({ user, db, onRefresh, setPage, isOverride = false }) {
               )}
             </div>
           ) : (
-            <input className="form-input" placeholder={form.type==="Concept"?"https://loom.com/share/...":"https://tiktok.com/@..."} value={form.concept_link} onChange={e=>setForm({...form,concept_link:e.target.value})}/>
+            <div>
+              <input
+                className="form-input"
+                placeholder={form.type==="Concept" ? "https://loom.com/share/..." : "e.g. https://vt.tiktok.com/... or https://www.instagram.com/reel/..."}
+                value={form.concept_link}
+                onChange={e => {
+                  setForm({ ...form, concept_link: e.target.value });
+                  setVerifiedVideo(null);
+                  setVerifyErr("");
+                }}
+              />
+              <div className="form-hint" style={{ marginTop: 4 }}>
+                {form.type==="Concept"
+                  ? "Paste a Loom, Google Drive, or Frame.io review link."
+                  : "Desktop URLs and mobile share links (vt.tiktok.com, youtu.be, etc.) are unrolled automatically."}
+              </div>
+            </div>
           )}
         </div>
 
         {form.type==="Final"&&(
-          <div className="form-group">
-            <label className="form-label">Platform</label>
-            <select className="select" value={form.platform} onChange={e=>setForm({...form,platform:e.target.value})}>
-              {["TikTok","Instagram","Facebook","YouTube"].map(p=><option key={p}>{p}</option>)}
-            </select>
-          </div>
+          <>
+            <div className="form-group">
+              <label className="form-label">Platform</label>
+              <select className="select" value={form.platform} onChange={e => handlePlatformChange(e.target.value)}>
+                {["TikTok","Instagram","YouTube","Facebook"].map(p=><option key={p}>{p}</option>)}
+              </select>
+            </div>
+
+            {uploadMode==="link"&&(
+              <div className="form-group">
+                <label className="form-label">
+                  Platform Account Handle <span style={{color:"var(--ink3)",fontWeight:400}}>(must match the video author)</span>
+                </label>
+                <div style={{ display: "flex", gap: 8 }}>
+                  <div style={{ position: "relative", flex: 1 }}>
+                    <span style={{ position: "absolute", left: 12, top: "50%", transform: "translateY(-50%)", color: "var(--ink3)", fontWeight: 600 }}>@</span>
+                    <input
+                      className="form-input"
+                      style={{ paddingLeft: 28 }}
+                      placeholder="e.g. alex_ugc"
+                      value={form.handle}
+                      onChange={e => {
+                        setForm({ ...form, handle: e.target.value });
+                        setVerifiedVideo(null);
+                        setVerifyErr("");
+                      }}
+                    />
+                  </div>
+                  <button
+                    type="button"
+                    className="btn btn-ghost"
+                    onClick={() => verifyLink()}
+                    disabled={verifying || !form.concept_link || !form.handle}
+                    style={{ whiteSpace: "nowrap" }}
+                  >
+                    {verifying ? "⏳ Verifying..." : "⚡ Verify Video"}
+                  </button>
+                </div>
+                <div className="form-hint" style={{ marginTop: 4 }}>
+                  Pre filled from your profile. We verify that the author of the video matches your handle before recording views.
+                </div>
+
+                {verifyErr && (
+                  <div style={{
+                    marginTop: 10,
+                    padding: "10px 14px",
+                    background: "rgba(239, 68, 68, 0.08)",
+                    border: "1px solid rgba(239, 68, 68, 0.25)",
+                    borderRadius: "var(--radius-sm)",
+                    color: "var(--red)",
+                    fontSize: 12,
+                    lineHeight: 1.5
+                  }}>
+                    ⚠️ {verifyErr}
+                  </div>
+                )}
+
+                {verifiedVideo && (
+                  <div style={{
+                    marginTop: 10,
+                    padding: 12,
+                    background: "rgba(16, 185, 129, 0.08)",
+                    border: "1px solid rgba(16, 185, 129, 0.3)",
+                    borderRadius: "var(--radius-sm)",
+                    display: "flex",
+                    gap: 12,
+                    alignItems: "center"
+                  }}>
+                    {verifiedVideo.thumbnailUrl ? (
+                      <img
+                        src={verifiedVideo.thumbnailUrl}
+                        alt="Video thumbnail"
+                        style={{ width: 56, height: 56, objectFit: "cover", borderRadius: 6, flexShrink: 0 }}
+                      />
+                    ) : (
+                      <div style={{ width: 56, height: 56, borderRadius: 6, background: "var(--bg3)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 22, flexShrink: 0 }}>
+                        🎬
+                      </div>
+                    )}
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 2 }}>
+                        <span style={{ fontSize: 11, fontWeight: 700, textTransform: "uppercase", color: "var(--green)", letterSpacing: 0.5 }}>
+                          ✓ Ownership Confirmed
+                        </span>
+                        <span style={{ fontSize: 12, color: "var(--ink2)", fontWeight: 600 }}>
+                          @{verifiedVideo.authorHandle}
+                        </span>
+                      </div>
+                      {verifiedVideo.title && (
+                        <div style={{ fontSize: 12, color: "var(--ink)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", marginBottom: 4 }}>
+                          {verifiedVideo.title}
+                        </div>
+                      )}
+                      <div style={{ display: "flex", gap: 10, fontSize: 11, color: "var(--ink3)" }}>
+                        <span>👁️ <strong>{Number(verifiedVideo.views || 0).toLocaleString()}</strong> views</span>
+                        <span>❤️ <strong>{Number(verifiedVideo.likes || 0).toLocaleString()}</strong> likes</span>
+                        {verifiedVideo.comments > 0 && <span>💬 <strong>{Number(verifiedVideo.comments).toLocaleString()}</strong></span>}
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+          </>
         )}
 
         <div className="form-group">
@@ -2068,6 +2339,24 @@ function MySubmissions({ user, db }) {
 
                 <div className="heading-md" style={{marginBottom: 4, lineHeight: 1.2}}>{camp?.name || "Unknown Campaign"}</div>
                 <div className="fs-12 text-muted mb-16">Submitted on {fmtDate(s.created_at)}</div>
+
+                {s.submission_type === "Final" && (s.posted_link || s.posted_url) && (
+                  <div style={{ margin: "0 0 16px 0", padding: "10px 12px", background: "var(--bg2)", borderRadius: "var(--radius-sm)", border: "1px solid var(--border2)" }}>
+                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: (s.view_count_verified != null && Number(s.view_count_verified) > 0) ? 6 : 0 }}>
+                      <span style={{ fontSize: 11, color: "var(--ink3)", textTransform: "uppercase", fontWeight: 600 }}>
+                        {s.platform || "Video"}
+                      </span>
+                      <a href={s.posted_link || s.posted_url} target="_blank" rel="noreferrer" className="link" style={{ fontSize: 12 }}>
+                        View Video ↗
+                      </a>
+                    </div>
+                    {s.view_count_verified != null && Number(s.view_count_verified) > 0 && (
+                      <div style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12, color: "var(--green)", fontWeight: 600 }}>
+                        <span>✓ {Number(s.view_count_verified).toLocaleString()} verified views</span>
+                      </div>
+                    )}
+                  </div>
+                )}
 
                 {s.feedback ? (
                   <div style={{ marginTop: 'auto', background: 'var(--bg2)', padding: '16px', borderRadius: 'var(--radius-sm)', border: '1px solid var(--border2)' }}>
@@ -2562,9 +2851,16 @@ function ReviewQueue({ db, onRefresh, user }) {
         {/* Video preview link */}
         {videoLink&&(
           <div style={{margin:"10px 0",padding:"10px 12px",background:"var(--bg2)",borderRadius:"var(--radius-sm)",display:"flex",alignItems:"center",justifyContent:"space-between"}}>
-            <span style={{fontSize:12,color:"var(--ink3)"}}>
-              {tab==="concepts"?"📽️ Concept":"🎬 Final"} · {campaign?.format}
-            </span>
+            <div>
+              <span style={{fontSize:12,color:"var(--ink3)"}}>
+                {tab==="concepts"?"📽️ Concept":"🎬 Final"} · {campaign?.format || s.platform || "Video"}
+              </span>
+              {s.view_count_verified != null && Number(s.view_count_verified) > 0 && (
+                <div style={{ fontSize: 11, color: "var(--green)", fontWeight: 600, marginTop: 2 }}>
+                  ✓ {Number(s.view_count_verified).toLocaleString()} verified views
+                </div>
+              )}
+            </div>
             <a href={videoLink} target="_blank" rel="noreferrer" className="btn btn-sm btn-primary">View Video →</a>
           </div>
         )}

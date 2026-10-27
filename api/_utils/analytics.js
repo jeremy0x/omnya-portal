@@ -134,11 +134,12 @@ function extractVideoId(platform, url) {
 const SHORT_LINK_PATTERNS = [
   /^(?:https?:\/\/)?(?:vm|vt)\.tiktok\.com\//i,
   /tiktok\.com\/t\//i,
+  /youtu\.be\//i,
   /fb\.watch\//i,
   /facebook\.com\/share\//i,
   /instagram\.com\/share\//i,
 ];
-const SHORT_LINK_TIMEOUT_MS = 5000;
+const SHORT_LINK_TIMEOUT_MS = 10000;
 
 async function resolveShortLink(url) {
   if (!url || typeof url !== 'string') return url;
@@ -153,7 +154,7 @@ async function resolveShortLink(url) {
       method: 'GET',
       redirect: 'follow',
       signal: controller.signal,
-      headers: { 'User-Agent': 'Mozilla/5.0 (compatible; OmnyaAnalytics/1.0)' },
+      headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36' },
     });
     try { if (resp.body && resp.body.cancel) await resp.body.cancel(); } catch { /* body unused */ }
     return resp.url || trimmed;
@@ -549,8 +550,9 @@ async function syncSubmissions(supabase, submissions) {
   for (const { userId, platform, submissions: groupSubs } of groups.values()) {
     const account = tokenIndex.get(`${userId}_${platform}`);
     if (!account) {
-      if (platform === 'tiktok' && process.env.SCRAPECREATORS_API_KEY) {
-        await syncTikTokPublicGroup(supabase, groupSubs, userId, summary);
+      const hasLinkTracking = groupSubs.some((s) => s.verified_views_source === 'link');
+      if (hasLinkTracking && ['tiktok', 'instagram', 'youtube'].includes(platform) && process.env.SCRAPECREATORS_API_KEY) {
+        await syncSocialPublicGroup(supabase, groupSubs, userId, platform, summary);
         continue;
       }
       summary.skipped += groupSubs.length;
@@ -564,8 +566,9 @@ async function syncSubmissions(supabase, submissions) {
     // provider refusal it flags the row for reconnect rather than discarding it.
     const refresh = await refreshIfNeeded(account, { supabase });
     if (!refresh.accessToken) {
-      if (platform === 'tiktok' && process.env.SCRAPECREATORS_API_KEY) {
-        await syncTikTokPublicGroup(supabase, groupSubs, userId, summary);
+      const hasLinkTracking = groupSubs.some((s) => s.verified_views_source === 'link');
+      if (hasLinkTracking && ['tiktok', 'instagram', 'youtube'].includes(platform) && process.env.SCRAPECREATORS_API_KEY) {
+        await syncSocialPublicGroup(supabase, groupSubs, userId, platform, summary);
         continue;
       }
       summary.failed += groupSubs.length;
@@ -711,30 +714,31 @@ async function syncSubmissions(supabase, submissions) {
 }
 
 // -----------------------------------------------------------------------------
-// Public TikTok sync fallback (ScrapeCreators)
+// Public social sync fallback (ScrapeCreators for TikTok, Instagram, YouTube)
 // -----------------------------------------------------------------------------
 
-async function syncTikTokPublicGroup(supabase, groupSubs, userId, summary) {
-  const { getVideo } = require('./tiktokPublic');
+async function syncSocialPublicGroup(supabase, groupSubs, userId, platform, summary) {
+  const { fetchPublicVideo } = require('./socialPublic');
   for (const sub of groupSubs) {
     summary.processed += 1;
     const url = sub.posted_link || sub.posted_url || sub.concept_link;
-    const video = await getVideo(url);
-    if (video.error) {
+    const res = await fetchPublicVideo({ url, platform });
+    if (!res.ok) {
       summary.failed += 1;
-      summary.errors.push({ submission_id: sub.id, platform: 'tiktok', reason: video.error });
+      summary.errors.push({ submission_id: sub.id, platform, reason: res.error });
       continue;
     }
 
+    const video = res.video;
     const engagementRate = calculateEngagementRate(video);
     const row = {
       user_id: userId,
       creator_id: sub.creator_id,
       submission_id: sub.id,
       campaign_id: sub.campaign_id,
-      platform: 'tiktok',
+      platform: res.platform,
       video_id: video.id || sub.videoId,
-      video_url: url,
+      video_url: res.resolvedUrl || url,
       views: video.views || 0,
       likes: video.likes || 0,
       comments: video.comments || 0,
@@ -754,34 +758,42 @@ async function syncTikTokPublicGroup(supabase, groupSubs, userId, summary) {
     }
 
     try {
+      const nowIso = new Date().toISOString();
+      const newViews = Math.max(Number(sub.view_count_verified || 0), Number(video.views || 0));
       await supabase
         .from('submissions')
         .update({
+          view_count_verified: newViews,
+          view_count_verified_at: nowIso,
+          verified_views_source: 'link',
+          posted_link: res.resolvedUrl || sub.posted_link,
           likes: video.likes || 0,
           comments: video.comments || 0,
           shares: video.shares || 0,
           saves: video.saves || 0,
           views_24h: video.views || 0,
-          analytics_synced_at: new Date().toISOString(),
+          analytics_synced_at: nowIso,
         })
         .eq('id', sub.id);
 
-      const { data: acct } = await supabase
-        .from('creator_social_accounts')
-        .select('link_handle, link_status')
-        .eq('user_id', userId)
-        .eq('platform', 'tiktok')
-        .eq('link_status', 'verified')
-        .maybeSingle();
+      if (res.platform === 'tiktok') {
+        const { data: acct } = await supabase
+          .from('creator_social_accounts')
+          .select('link_handle, link_status')
+          .eq('user_id', userId)
+          .eq('platform', 'tiktok')
+          .eq('link_status', 'verified')
+          .maybeSingle();
 
-      if (acct && acct.link_handle) {
-        await supabase.rpc('apply_verified_views', {
-          p_submission_id: sub.id,
-          p_views: video.views,
-          p_source: 'link',
-          p_user_id: userId,
-          p_handle: acct.link_handle,
-        });
+        if (acct && acct.link_handle) {
+          await supabase.rpc('apply_verified_views', {
+            p_submission_id: sub.id,
+            p_views: video.views,
+            p_source: 'link',
+            p_user_id: userId,
+            p_handle: acct.link_handle,
+          });
+        }
       }
     } catch (_) {}
 
@@ -789,12 +801,16 @@ async function syncTikTokPublicGroup(supabase, groupSubs, userId, summary) {
   }
 }
 
+async function syncTikTokPublicGroup(supabase, groupSubs, userId, summary) {
+  return syncSocialPublicGroup(supabase, groupSubs, userId, 'tiktok', summary);
+}
+
 // -----------------------------------------------------------------------------
 // Submissions query helpers — used by both sync entry points.
 // -----------------------------------------------------------------------------
 
 const SUBMISSION_SELECT =
-  'id, creator_id, campaign_id, platform, posted_link, posted_url, concept_link, submission_type, creators!inner(user_id)';
+  'id, creator_id, campaign_id, platform, posted_link, posted_url, concept_link, submission_type, verified_views_source, creators!inner(user_id)';
 
 async function fetchAllFinalSubmissions(supabase) {
   const { data, error } = await supabase
