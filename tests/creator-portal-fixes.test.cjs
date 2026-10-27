@@ -72,7 +72,7 @@ console.log('\n=== Guards against defects that have already happened once');
   R(inline.length === 0,
     "no OAuth callback responds with HTML or inline script (blocked by script-src 'self')", inline.join(', '));
 
-  const cc = code('src/CreatorConnections.js');
+  const cc = code('src/pages/CreatorConnections.js');
   R(!/window\.opener|\.popup\.closed|addEventListener\(\s*['"]message['"]/.test(cc),
     'the connect flow does not depend on window.opener, popup.closed or postMessage (all broken by COOP same-origin)');
 
@@ -94,7 +94,7 @@ console.log('\n=== Guards against defects that have already happened once');
 
   process.env.TIKTOK_REDIRECT_URI = '';
   const { redirectUriFor } = require(path.join(ROOT, 'api/_utils/oauth'));
-  const documented = (read('SOCIAL_MEDIA_INTEGRATION.md').match(/\$\{APP_BASE_URL\}(\/api\/[a-z/]*tiktok\/callback)/) || [])[1];
+  const documented = (read('docs/guides/social-media-integration.md').match(/\$\{APP_BASE_URL\}(\/api\/[a-z/]*tiktok\/callback)/) || [])[1];
   R(!!documented && redirectUriFor('tiktok').endsWith(documented),
     'the TikTok redirect URI the code sends is the one the setup guide says to register',
     `code=${redirectUriFor('tiktok')} docs=${documented}`);

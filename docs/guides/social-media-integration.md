@@ -212,7 +212,7 @@ explicitly using the helpers in `api/_utils/auth.js`.
 
 ## 8. Connect flow (frontend)
 
-`src/CreatorConnections.js` implements:
+`src/pages/CreatorConnections.js` implements:
 
 1. On mount, calls `GET /api/social/connections`. Renders one card per
    platform, defaulting unconfigured platforms to `disconnected`.
@@ -437,7 +437,7 @@ Tracked separately:
 - Analytics sync rewrite against the new `creator_tokens` schema, with token
   refresh, per-platform error reporting, and structured logging.
 - `POST /api/analytics/manual-sync` for creator-initiated refresh.
-- `src/AnalyticsDashboard.js` rewrite to query the new normalized columns
+- `src/pages/AnalyticsDashboard.js` rewrite to query the new normalized columns
   and surface `last_error` per submission.
 - Removal of the legacy `creator_id`-based routes
   (`api/analytics/refresh.js`, `api/analytics/fetch.js`, `api/analytics.js`,

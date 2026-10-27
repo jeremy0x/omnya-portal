@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { supabase } from '../supabaseClient';
-import AnalyticsDashboard from '../AnalyticsDashboard';
+import AnalyticsDashboard from './AnalyticsDashboard';
 import { fmtDate, fmtNum, calcPacing, platformMeta, isBreakoutVideo } from '../utils';
 import LoadingSpinner from '../components/LoadingSpinner';
 import CampaignProgressCard from '../components/CampaignProgressCard';

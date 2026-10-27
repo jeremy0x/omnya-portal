@@ -19,7 +19,7 @@
 // result of the connect they had just completed. The three other callbacks
 // (auth/instagram, auth/meta, auth/youtube) already use
 // page=social-connections&connected=<platform>; this one now matches them
-// exactly, which is what src/CreatorConnections.js's mount effect reads.
+// exactly, which is what src/pages/CreatorConnections.js's mount effect reads.
 //
 // Tokens NEVER appear in logs or responses.
 

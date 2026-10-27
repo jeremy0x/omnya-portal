@@ -11,9 +11,9 @@ The whole browser app: one Create React App bundle serving owners, account manag
 | `App.js` | Session, role resolution, `loadDB()`, the `navs` sidebar map plus `navsFor(role, caps)`, and the per role `if (page === "…")` render ladder near the bottom |
 | `supabaseClient.js` | The anon key client; throws if `REACT_APP_SUPABASE_URL` or `REACT_APP_SUPABASE_ANON_KEY` is missing |
 | `utils.js` | Shared formatters (`fmtMoney`, `fmtNum`, `fmtDate`), `platformMeta`, status badges |
-| `pages/` | Role dashboards (`ClientDashboard`, `CreatorDashboard`), owner admin (`UserManagement`, `AuditHistory`, `SystemConfig`), and the public `SharedCampaignReport` |
+| `pages/` | Role dashboards (`ClientDashboard`, `CreatorDashboard`, `AnalyticsDashboard`), owner admin (`UserManagement`, `AuditHistory`, `SystemConfig`), `Legal`, the public `SharedCampaignReport` and `Landing` |
 | `components/PayoutManager.js`, `components/CreatorEarnings.js` | Money screens; every money action goes through `/api/*` |
-| `CreatorConnections.js` | Social account connect and disconnect UI (OAuth starts in `api/auth/*`) |
+| `pages/CreatorConnections.js` | Social account connect and disconnect UI (OAuth starts in `api/auth/*`) |
 
 ## Conventions
 
@@ -24,7 +24,6 @@ The whole browser app: one Create React App bundle serving owners, account manag
 
 ## Gotchas
 
-- `components/Guards/RequireRole.js` and `contexts/AuthContext.js` are dead code. They import `react-router-dom`, which is not installed. Do not wire them in.
 - `App.js` starts with `/* eslint-disable */`; other files are linted, and `CI=true npm run build` fails on warnings there.
 - `npm start` does not serve `/api/*`. Use `node tests/lib/devServer.cjs` (port 3100) when a screen calls the API, or it will look broken when it is not.
 - Do not call third party hosts from the browser. The CSP blocks everything except Supabase.
