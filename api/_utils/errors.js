@@ -50,6 +50,10 @@ const Errors = {
     sendError(res, 405, 'method_not_allowed', msg),
   rateLimited: (res, msg = 'Too many requests') =>
     sendError(res, 429, 'rate_limited', msg),
+  unprocessable: (res, msg = 'Unprocessable entity', details) =>
+    sendError(res, 422, (details && details.code) || 'unprocessable', msg, details),
+  badGateway: (res, msg = 'Bad gateway', details) =>
+    sendError(res, 502, 'bad_gateway', msg, details),
   internal: (res, msg = 'Internal server error', details) =>
     sendError(res, 500, 'internal', msg, details),
   // `migration` is the file name under supabase/migrations; `what` is a short
