@@ -31,6 +31,7 @@ _These are recommendations to keep your build orderly, not requirements. Skip an
 | 12 | Responsive and accessibility QA | Slice 2 | planned |
 | 13 | Go live evidence and sign off | Slice 2 | planned |
 | 14 | TikTok profile link tracking | Slice 1 | in-progress |
+| 15 | Single video link verification | Slice 2 | in-progress |
 | G | UGC dashboards | Deferred | in-progress |
 | H | Shared migration credentials | Deferred | planned |
 | I | Align connection status CHECK | Deferred | planned |
@@ -155,6 +156,21 @@ Check every role's screens on phone and tablet, and fix contrast, keyboard use a
 The readiness gate from the original scope: proof for each area, then the owner accepts it along with the known limits.
 **Done when:** every gate (scope, data integrity, RBAC, payout safety, integrations, observability, recovery, quality, security) links to its proof, third party blockers are listed, and the owner signs off.
 - [ ] Design it (spec): `/architect go live evidence and sign off`
+
+### 15. Single video link verification · in-progress
+A creator submits a video link alongside their account handle for TikTok, Instagram, or YouTube. The system resolves mobile share short links, fetches public metrics for that single video from the provider, confirms the video author matches the entered handle, and stores verified views and engagement metrics.
+**Done when:** a creator submits a video URL and handle across TikTok, Instagram, or YouTube, short links like vt.tiktok.com or youtu.be resolve automatically, authorship is verified against the provider payload, views and engagement metrics are written to the submission without whole profile crawling, and mismatched authors are rejected with a clear error.
+spec [0003](../specs/0003-single-video-link-verification/index.md) · code in `api/social/verify-video-link.js`, `api/_utils/socialPublic.js`, `src/App.js`
+- [x] Design it (spec): `/architect single video link verification`
+- [x] Build it: `/develop single video link verification`
+  - [x] Provider adapter for single video fetching across TikTok, Instagram, and YouTube (AC-2, AC-3)
+  - [x] Verification API endpoint with author confirmation and verified views write (AC-4, AC-5, AC-7)
+  - [x] Content submission form UI update with pre filled handle and video link inputs (AC-1, AC-4, AC-5)
+  - [x] Integration with manual sync and campaign analytics dashboards for on demand refreshes (AC-5, AC-6)
+- [x] Verify it: `/check verify single video link verification`
+- [ ] Test it: `/test single video link verification`
+- [ ] Review it (fresh model): `/check review single video link verification`
+- [ ] Document it: `/document single video link verification`
 
 ## Deferred
 
