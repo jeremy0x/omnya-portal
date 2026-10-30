@@ -1,11 +1,12 @@
 import { useEffect, useState } from "react";
-import { Folder01Icon, UserIcon } from "@hugeicons/core-free-icons";
+import { Folder01Icon, InformationCircleIcon, UserIcon } from "@hugeicons/core-free-icons";
 import { gooeyToast as toast } from "goey-toast";
 import { sendEmail } from "../../lib/api";
 import { describeWriteError } from "../../lib/db";
 import { supabase } from "../../supabaseClient";
 import Alert from "../../ui/Alert";
 import EmptyState from "../../ui/EmptyState";
+import Icon from "../../ui/Icon";
 import PageHeader from "../../ui/PageHeader";
 import Segmented from "../../ui/Segmented";
 import { DropZone, HowItWorks, VerifiedVideo } from "./submit/parts";
@@ -13,8 +14,7 @@ import { authedPost, linkPlatform, useConnectedPlatforms, useVerifyLink } from "
 import Select from "../../ui/Select";
 import { campaignPlatform } from "../../utils";
 
-const PLATFORMS = ["TikTok", "Instagram", "YouTube", "Facebook"];
-const BLANK = { campaign_id: "", type: "Concept", concept_link: "", posted_link: "", platform: "TikTok", comment: "" };
+const BLANK = { campaign_id: "", type: "Concept", concept_link: "", posted_link: "", comment: "" };
 
 // isOverride (§5.2): the owner files a submission on a creator's behalf, picking the creator first.
 export default function SubmitContent({ user, db, onRefresh, setPage, isOverride = false }) {
@@ -74,8 +74,7 @@ export default function SubmitContent({ user, db, onRefresh, setPage, isOverride
     );
   }
 
-  const lockedPlatform = campaignPlatform(db.campaigns.find(c => c.id === form.campaign_id));
-  const platform = lockedPlatform || form.platform;
+  const platform = campaignPlatform(db.campaigns.find(c => c.id === form.campaign_id));
 
   const uploadToStorage = async (fileObj, campaignId) => {
     const campaign = db.campaigns.find(c => c.id === campaignId);
@@ -97,7 +96,7 @@ export default function SubmitContent({ user, db, onRefresh, setPage, isOverride
     if (uploadMode === "file" && !file) return setErr("Add the video file, or switch to pasting a link.");
     if (uploadMode === "link" && !form.concept_link.trim()) return setErr("Paste the video link.");
     const linked = form.type === "Final" && uploadMode === "link" ? linkPlatform(form.concept_link) : null;
-    if (lockedPlatform && linked && linked !== lockedPlatform) return setErr(`This campaign is for ${lockedPlatform} videos. Paste the link to your ${lockedPlatform} post.`);
+    if (linked && linked !== platform) return setErr(`This campaign is for ${platform} videos. Paste the link to your ${platform} post.`);
     if (form.type === "Final" && !isConnected(platform)) return setErr(`Connect ${platform} on the Social channels page first, so views can be verified.`);
     setSubmitting(true); setErr(""); setUploadProgress(0);
 
@@ -162,16 +161,24 @@ export default function SubmitContent({ user, db, onRefresh, setPage, isOverride
               </Select>
             </div>
             <div className="form-group" style={{ marginBottom: 0 }}>
-              <span className="form-label" id="type-label">What are you sending?</span>
+              <span className="form-label" id="type-label">Has this video been posted?</span>
               <Segmented label="Submission type" value={form.type} onChange={t => { set({ type: t }); resetVerify(); if (t === "Final") setUploadMode("link"); }}
-                options={[["Concept", "Concept for approval"], ["Final", "Final posted video"]]} />
+                options={[["Concept", "Not yet"], ["Final", "Yes, it's live"]]} />
+              <span className="form-hint">{form.type === "Concept" ? "Your account manager will review it before you post." : "We'll confirm it's yours and start tracking views."}</span>
             </div>
           </div>
 
           <div className="form-section">
             <div className="flex-between mb-12">
-              <span className="form-label">Video</span>
-              <Segmented label="Upload method" value={uploadMode} onChange={m => { setUploadMode(m); resetVerify(); }} options={[["file", "Upload file"], ["link", "Paste link"]]} />
+              <span className="form-label" style={{ display: "inline-flex", alignItems: "center", gap: 6, marginBottom: 0 }}>
+                Video
+                {uploadMode === "link" && (
+                  <button type="button" className="info-tip" aria-label="Which links work" data-tip={form.type === "Concept" ? "Loom, Google Drive or Frame.io links work." : `Paste the link to your ${platform || "posted"} video. App share links work too.`}>
+                    <Icon icon={InformationCircleIcon} size={15} />
+                  </button>
+                )}
+              </span>
+              {form.type === "Concept" && <Segmented label="Upload method" value={uploadMode} onChange={m => { setUploadMode(m); resetVerify(); }} options={[["file", "Upload file"], ["link", "Paste link"]]} />}
             </div>
             {uploadMode === "file" ? (
               <DropZone file={file} onFile={setFile} progress={uploadProgress} busy={submitting} />
@@ -179,27 +186,12 @@ export default function SubmitContent({ user, db, onRefresh, setPage, isOverride
               <div className="form-group" style={{ marginBottom: 0 }}>
                 <label className="sr-only" htmlFor="video-link">{linkLabel}</label>
                 <input id="video-link" className="form-input" inputMode="url" value={form.concept_link}
-                  placeholder={form.type === "Concept" ? "https://www.loom.com/share/…" : "https://www.tiktok.com/@you/video/…"}
-                  onChange={e => {
-                    const detected = form.type === "Final" ? linkPlatform(e.target.value) : null;
-                    set({ concept_link: e.target.value, ...(detected ? { platform: detected } : {}) });
-                    resetVerify();
-                  }} />
-                <span className="form-hint">{form.type === "Concept" ? "A Loom, Google Drive or Frame.io link the team can open." : "App share links like vt.tiktok.com or youtu.be work too."}</span>
+                  placeholder="https://…"
+                  onChange={e => { set({ concept_link: e.target.value }); resetVerify(); }} />
               </div>
             )}
 
-            {form.type === "Final" && (
-              <div className="form-row mt-16">
-                <div className="form-group" style={{ marginBottom: 0 }}>
-                  <label className="form-label" htmlFor="platform">Platform</label>
-                  <Select id="platform" className="select" value={platform} disabled={!!lockedPlatform} onChange={e => { set({ platform: e.target.value }); resetVerify(); }}>
-                    {PLATFORMS.map(p => <option key={p}>{p}</option>)}
-                  </Select>
-                  {!isConnected(platform) && <span className="form-error">Connect {platform} on Social channels to submit {platform} videos.</span>}
-                </div>
-              </div>
-            )}
+            {form.type === "Final" && platform && !isConnected(platform) && <span className="form-error">Connect {platform} on Social channels to submit {platform} videos.</span>}
             {verifyErr && <Alert tone="error" style={{ marginTop: 12 }}>{verifyErr}</Alert>}
             {verifiedVideo && <VerifiedVideo video={verifiedVideo} />}
           </div>
