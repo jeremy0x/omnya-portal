@@ -1,7 +1,6 @@
 import { useRef, useState } from "react";
 import { Upload04Icon, Video01Icon } from "@hugeicons/core-free-icons";
 import Icon from "../../../ui/Icon";
-import { fmtCompactNum } from "../../../utils";
 
 export function DropZone({ file, onFile, progress, busy }) {
   const [over, setOver] = useState(false);
@@ -36,27 +35,10 @@ export function DropZone({ file, onFile, progress, busy }) {
   );
 }
 
-export function VerifiedVideo({ video }) {
-  return (
-    <div className="alert alert-success mt-12" style={{ alignItems: "center" }}>
-      {video.thumbnailUrl
-        ? <img src={video.thumbnailUrl} alt="" style={{ width: 48, height: 48, objectFit: "cover", borderRadius: 6, flexShrink: 0 }} />
-        : <span className="empty-icon" style={{ margin: 0, width: 48, height: 48 }}><Icon icon={Video01Icon} size={18} /></span>}
-      <div className="alert-body">
-        <div className="alert-title">It's yours{video.authorHandle ? `, posted by @${video.authorHandle}` : ""}</div>
-        {video.title && <div className="truncate" style={{ color: "var(--ink2)" }}>{video.title}</div>}
-        <div className="fs-12" style={{ color: "var(--ink2)" }}>
-          {fmtCompactNum(video.views || 0)} views · {fmtCompactNum(video.likes || 0)} likes{video.comments > 0 ? ` · ${fmtCompactNum(video.comments)} comments` : ""}
-        </div>
-      </div>
-    </div>
-  );
-}
-
 export function HowItWorks({ type }) {
   const steps = [
     ["Send a concept", "A rough cut or draft for your account manager to approve before you post."],
-    ["Get feedback", "Approval or notes usually land within 1 to 3 days. You'll see them in Submissions."],
+    ["Get feedback", "Approval or notes usually arrive within 1 to 3 days. You'll see them in Submissions."],
     ["Post and send the link", "Once it's live, submit the final link. We confirm it's yours and start tracking views."],
   ];
   const active = type === "Final" ? 2 : 0;

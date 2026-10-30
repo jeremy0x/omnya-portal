@@ -9,7 +9,7 @@ import EmptyState from "../../ui/EmptyState";
 import Icon from "../../ui/Icon";
 import PageHeader from "../../ui/PageHeader";
 import Segmented from "../../ui/Segmented";
-import { DropZone, HowItWorks, PostedChoice, VerifiedVideo } from "./submit/parts";
+import { DropZone, HowItWorks, PostedChoice } from "./submit/parts";
 import { authedPost, linkPlatform, useConnectedPlatforms, useVerifyLink } from "./submit/useVerifyLink";
 import Select from "../../ui/Select";
 import { campaignPlatform, platformMeta } from "../../utils";
@@ -136,7 +136,7 @@ export default function SubmitContent({ user, db, onRefresh, setPage, isOverride
     resetVerify();
     onRefresh?.();
     toast.success(`${form.type === "Final" ? "Final video" : "Concept"} sent for review`, {
-      description: isOverride ? `Filed for ${creator.name}.` : "Your account manager has been notified. Feedback usually lands within 1 to 3 days.",
+      description: isOverride ? `Filed for ${creator.name}.` : "Your account manager has been notified. Feedback usually arrives within 1 to 3 days.",
     });
     if (isOverride) setOverrideCreatorId("");
     else setPage("submissions");
@@ -189,7 +189,6 @@ export default function SubmitContent({ user, db, onRefresh, setPage, isOverride
 
             {form.type === "Final" && platform && !isConnected(platform) && <span className="form-error">Connect {platform} on Social channels to submit {platform} videos.</span>}
             {verifyErr && <Alert tone="error" style={{ marginTop: 12 }}>{verifyErr}</Alert>}
-            {verifiedVideo && <VerifiedVideo video={verifiedVideo} />}
           </div>
 
           <div className="form-section">
