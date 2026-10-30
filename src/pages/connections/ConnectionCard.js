@@ -1,4 +1,6 @@
-import { Alert02Icon, CheckmarkCircle02Icon } from "@hugeicons/core-free-icons";
+import { useState } from "react";
+import { Alert02Icon, CheckmarkCircle02Icon, HelpCircleIcon } from "@hugeicons/core-free-icons";
+import Dialog from "../../ui/Dialog";
 import Icon from "../../ui/Icon";
 import { fmtRelativeTime } from "../../utils";
 import { deriveConnectionState, PLATFORM_META } from "./state";
@@ -8,6 +10,8 @@ export default function ConnectionCard({ platform, connection, busy, onConnect, 
   const state = deriveConnectionState(connection);
   const scopes = connection?.scopes || [];
   const handle = connection?.username || connection?.platformUsername;
+  const [guideOpen, setGuideOpen] = useState(false);
+  const pages = connection?.pages || [];
 
   return (
     <article className={`conn-card ${state.connected ? "is-connected" : ""}`}>
@@ -24,6 +28,7 @@ export default function ConnectionCard({ platform, connection, busy, onConnect, 
           </div>
         </div>
         <div className="conn-actions">
+          {meta.guide && <button className="btn btn-ghost btn-sm" onClick={() => setGuideOpen(true)}><Icon icon={HelpCircleIcon} size={16} />How to connect</button>}
           {state.action === "manage" && meta.sync && (
             <button className="btn btn-secondary btn-sm" onClick={onSync} disabled={!!busy}>
               {busy === "sync" ? "Syncing…" : "Sync now"}
@@ -52,11 +57,14 @@ export default function ConnectionCard({ platform, connection, busy, onConnect, 
         </div>
       )}
 
-      {state.connected && (connection?.displayName || connection?.profileImageUrl || meta.scopeHints) && (
+      {state.connected && (connection?.displayName || connection?.profileImageUrl || meta.scopeHints || meta.guide) && (
         <div className="conn-profile">
           {connection?.profileImageUrl && <img src={connection.profileImageUrl} alt="" width="36" height="36" />}
           <div style={{ minWidth: 0 }}>
             {connection?.displayName && <div className="fw-600 fs-13 truncate">{connection.displayName}</div>}
+            {meta.guide && (
+              <div className="fs-12 text-muted mt-4">{pages.length ? `Pages: ${pages.map(p => p.name).join(", ")}` : "No Pages shared yet"}</div>
+            )}
             {(meta.scopeHints || []).map(h => {
               const granted = scopes.includes(h.scope);
               return (
@@ -67,6 +75,16 @@ export default function ConnectionCard({ platform, connection, busy, onConnect, 
             })}
           </div>
         </div>
+      )}
+
+      {guideOpen && (
+        <Dialog size="sm" title={`How to connect ${meta.label}`} onClose={() => setGuideOpen(false)}
+          actions={<button className="btn btn-primary" onClick={() => setGuideOpen(false)}>Got it</button>}>
+          <ol className="fs-14" style={{ listStyle: "decimal", paddingLeft: 18, display: "grid", gap: 8, color: "var(--ink2)" }}>
+            {meta.guide.steps.map(s => <li key={s}>{s}</li>)}
+          </ol>
+          <p className="fs-13 text-muted mt-12">{meta.guide.note}</p>
+        </Dialog>
       )}
     </article>
   );
